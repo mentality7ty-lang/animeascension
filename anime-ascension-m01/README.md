@@ -1,30 +1,27 @@
-# Anime Ascension — Milestone 0.1
+# Anime Ascension — Milestone 0.1.1
 
-First playable vertical slice foundation.
+Supabase integration milestone.
 
 ## Included
-- Cinematic boot screen
-- BEGIN flow
-- Character creator
-- Ninja World arrival
-- Human / Power 1 HUD
-- TRAIN interaction
-- Persistent browser save
-- Responsive layout
-- Framer Motion animation layer
+- Supabase Auth (email + password)
+- Cookie-based SSR session with `@supabase/ssr`
+- Protected game route
+- Cloud character creation in `public.characters`
+- Cloud-loaded player progression
+- `TRAIN` updates Power in Supabase instead of localStorage
+- Sign out
+- RLS-compatible data flow
+
+## Required Vercel environment variables
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+## Important Supabase dashboard setup
+Set the Auth Site URL to the production Vercel URL and add the same origin to Redirect URLs.
+If email confirmation is enabled, use the confirmation route `/auth/confirm`.
 
 ## Run locally
 ```bash
 npm install
 npm run dev
 ```
-Open http://localhost:3000
-
-## Next milestone
-- Real stamina
-- Strength / Speed / Endurance / Focus
-- Multiple training actions
-- Server-side save via Supabase
-
-## Supabase note
-The save layer is intentionally isolated in `lib/storage.ts`. In the next milestone it can be replaced by a Supabase-backed repository without rewriting the UI/game flow.
