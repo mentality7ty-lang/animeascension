@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './auth.css';
+import './combat.css';
 export const metadata: Metadata={title:'Anime Ascension',description:'Begin with nothing. Ascend beyond worlds.'};
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><body>{children}</body></html>}
