@@ -19,7 +19,8 @@ type Character = {
 
 type TrainableStat = 'strength' | 'speed' | 'endurance' | 'focus';
 type ExerciseId = 'pushups' | 'sprints' | 'run' | 'meditate';
-type Screen = 'boot' | 'creator' | 'world' | 'combat';
+type Screen = 'boot' | 'creator' | 'world' | 'combat' | 'awakening';
+type AwakeningPhase = 'stillness' | 'signal' | 'collapse' | 'spark' | 'awakened';
 
 type Exercise = {
   id: ExerciseId;
@@ -42,6 +43,8 @@ const exercises: Exercise[] = [
   { id: 'run', title: 'ENDURANCE RUN', subtitle: 'Keep moving when it hurts.', stat: 'endurance', gain: 1, powerGain: 2, staminaCost: 16, icon: 'END' },
   { id: 'meditate', title: 'MEDITATE', subtitle: 'Control breath and intent.', stat: 'focus', gain: 1, powerGain: 2, staminaCost: 10, icon: 'FOC' },
 ];
+
+const selectFields = 'id,name,power,strength,speed,endurance,focus,stamina,rank,world';
 
 export default function GameClient({ userId, initialCharacter }: { userId: string; initialCharacter: Character | null }) {
   const db = createClient();
@@ -66,17 +69,17 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
   const attackStartedAt = useRef(0);
   const attackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [awakeningPhase, setAwakeningPhase] = useState<AwakeningPhase>('stillness');
+  const [chakra, setChakra] = useState(initialCharacter?.rank?.toLowerCase().includes('chakra') ? 100 : 0);
+
   const cleanName = useMemo(() => name.trim() || 'Ari', [name]);
   const missionUnlocked = (character?.power ?? 0) >= 7;
+  const awakeningUnlocked = (character?.power ?? 0) >= 12 && !(character?.rank?.toLowerCase().includes('chakra'));
+  const awakened = character?.rank?.toLowerCase().includes('chakra') ?? false;
 
   async function enter() {
     setBusy(true);
-    const { data, error } = await db
-      .from('characters')
-      .insert({ user_id: userId, name: cleanName })
-      .select('id,name,power,strength,speed,endurance,focus,stamina,rank,world')
-      .single();
-
+    const { data, error } = await db.from('characters').insert({ user_id: userId, name: cleanName }).select(selectFields).single();
     if (data) {
       setCharacter(data as Character);
       setScreen('world');
@@ -96,21 +99,15 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     setBusy(true);
     setActiveExercise(exercise.id);
     setMessage(`${exercise.title}...`);
-
     const nextStat = character[exercise.stat] + exercise.gain;
     const nextPower = character.power + exercise.powerGain;
     const nextStamina = Math.max(0, character.stamina - exercise.staminaCost);
 
     const { data, error } = await db
       .from('characters')
-      .update({
-        [exercise.stat]: nextStat,
-        power: nextPower,
-        stamina: nextStamina,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ [exercise.stat]: nextStat, power: nextPower, stamina: nextStamina, updated_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .select('id,name,power,strength,speed,endurance,focus,stamina,rank,world')
+      .select(selectFields)
       .single();
 
     if (data) {
@@ -120,7 +117,6 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     } else if (error) {
       setMessage(`Save failed: ${error.message}`);
     }
-
     window.setTimeout(() => setActiveExercise(null), 650);
     setBusy(false);
   }
@@ -129,16 +125,8 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     if (!character || busy || character.stamina >= 100) return;
     setBusy(true);
     setActiveExercise('rest');
-    setMessage('Recovering...');
-
     const nextStamina = Math.min(100, character.stamina + 30);
-    const { data, error } = await db
-      .from('characters')
-      .update({ stamina: nextStamina, updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .select('id,name,power,strength,speed,endurance,focus,stamina,rank,world')
-      .single();
-
+    const { data, error } = await db.from('characters').update({ stamina: nextStamina, updated_at: new Date().toISOString() }).eq('user_id', userId).select(selectFields).single();
     if (data) {
       setCharacter(data as Character);
       setMessage(`STAMINA RECOVERED · ${nextStamina}/100`);
@@ -146,7 +134,6 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     } else if (error) {
       setMessage(`Save failed: ${error.message}`);
     }
-
     window.setTimeout(() => setActiveExercise(null), 650);
     setBusy(false);
   }
@@ -175,13 +162,26 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     const nextEnemyHp = Math.max(0, enemyHp - damage);
     setEnemyHp(nextEnemyHp);
     setCombatText(`STRIKE · ${damage} DAMAGE`);
-
     if (nextEnemyHp <= 0) {
       void finishCombat();
       return;
     }
+    window.setTimeout(beginEnemyAttack, 480);
+  }
 
-    window.setTimeout(() => beginEnemyAttack(), 480);
+  function chakraStrike() {
+    if (!awakened || chakra < 25 || !character || combatLocked || incoming || enemyDefeated) return;
+    setCombatLocked(true);
+    const damage = 18 + character.focus * 2;
+    const nextEnemyHp = Math.max(0, enemyHp - damage);
+    setEnemyHp(nextEnemyHp);
+    setChakra(current => Math.max(0, current - 25));
+    setCombatText(`CHAKRA STRIKE · ${damage} DAMAGE`);
+    if (nextEnemyHp <= 0) {
+      void finishCombat();
+      return;
+    }
+    window.setTimeout(beginEnemyAttack, 520);
   }
 
   function beginEnemyAttack() {
@@ -204,7 +204,6 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     if (!incoming && !guarded) return;
     setIncoming(false);
     setCombatLocked(true);
-
     if (perfect) {
       setPerfectFlash(true);
       setCombatText('PERFECT GUARD · NO DAMAGE');
@@ -213,19 +212,17 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
       return;
     }
 
-    const base = 16;
     const enduranceReduction = character ? Math.min(6, Math.floor(character.endurance / 2)) : 0;
+    const base = 16;
     const damage = guarded ? Math.max(2, Math.floor((base - enduranceReduction) * 0.35)) : Math.max(7, base - enduranceReduction);
     const nextHp = Math.max(0, playerHp - damage);
     setPlayerHp(nextHp);
     setCombatText(guarded ? `GUARD · ${damage} DAMAGE TAKEN` : `HIT · ${damage} DAMAGE TAKEN`);
-
     if (nextHp <= 0) {
       setCombatText('DEFEATED · RETRY THE TRAINING FIGHT');
       window.setTimeout(() => setCombatLocked(false), 450);
       return;
     }
-
     window.setTimeout(() => setCombatLocked(false), 500);
   }
 
@@ -235,17 +232,38 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
     setIncoming(false);
     setCombatLocked(true);
     setCombatText('MISSION COMPLETE · +5 POWER');
-
-    const { data } = await db
-      .from('characters')
-      .update({ power: character.power + 5, updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .select('id,name,power,strength,speed,endurance,focus,stamina,rank,world')
-      .single();
-
+    const { data } = await db.from('characters').update({ power: character.power + 5, updated_at: new Date().toISOString() }).eq('user_id', userId).select(selectFields).single();
     if (data) {
       setCharacter(data as Character);
       flashSaved();
+    }
+  }
+
+  function beginAwakening() {
+    if (!awakeningUnlocked || busy) return;
+    setScreen('awakening');
+    setAwakeningPhase('stillness');
+    window.setTimeout(() => setAwakeningPhase('signal'), 1500);
+    window.setTimeout(() => setAwakeningPhase('collapse'), 3100);
+    window.setTimeout(() => setAwakeningPhase('spark'), 4700);
+    window.setTimeout(() => void completeAwakening(), 6500);
+  }
+
+  async function completeAwakening() {
+    if (!character) return;
+    setAwakeningPhase('awakened');
+    setChakra(100);
+    const { data, error } = await db
+      .from('characters')
+      .update({ rank: 'Chakra Student', power: character.power + 10, focus: character.focus + 2, stamina: 100, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .select(selectFields)
+      .single();
+    if (data) {
+      setCharacter(data as Character);
+      flashSaved();
+    } else if (error) {
+      setMessage(`Awakening save failed: ${error.message}`);
     }
   }
 
@@ -260,10 +278,10 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
   }
 
   return (
-    <main className="game-shell">
+    <main className={`game-shell ${screen === 'awakening' ? 'awakening-shell' : ''}`}>
       <div className="noise" />
       <div className="vignette" />
-      <button className="account-button" onClick={signOut}>SIGN OUT</button>
+      {screen !== 'awakening' && <button className="account-button" onClick={signOut}>SIGN OUT</button>}
 
       <AnimatePresence mode="wait">
         {screen === 'boot' && (
@@ -299,14 +317,11 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
 
         {screen === 'world' && character && (
           <motion.section key="world" className="screen world-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="mountains" />
-            <div className="mist mist-a" />
-            <div className="mist mist-b" />
-
+            <div className="mountains" /><div className="mist mist-a" /><div className="mist mist-b" />
             <div className="world-copy">
               <p className="eyebrow">NINJA WORLD // OUTSKIRTS</p>
-              <h2>Your body is your first weapon.</h2>
-              <p className="muted">Train until someone finally notices you.</p>
+              <h2>{awakened ? 'Something inside you is finally awake.' : 'Your body is your first weapon.'}</h2>
+              <p className="muted">{awakened ? 'The world feels different now. Energy moves where silence used to be.' : 'Train until someone finally notices you.'}</p>
             </div>
 
             <div className="hud">
@@ -324,15 +339,15 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
             <div className="stamina-wrap">
               <div className="stamina-line"><span>STAMINA</span><strong>{character.stamina}/100</strong></div>
               <div className="stamina-track"><motion.div className="stamina-fill" animate={{ width: `${character.stamina}%` }} /></div>
+              {awakened && <div className="chakra-world-meter"><span>CHAKRA</span><strong>{chakra}/100</strong><div><motion.i animate={{ width: `${chakra}%` }} /></div></div>}
             </div>
 
             <div className="training-panel training-panel-v2">
               <div className="training-head">
-                <div><span className="quest-label">MILESTONE 0.3</span><h3>PHYSICAL TRAINING</h3></div>
+                <div><span className="quest-label">MILESTONE 0.4</span><h3>{awakened ? 'CHAKRA INITIATE' : 'PHYSICAL TRAINING'}</h3></div>
                 <span className="cloud-indicator">{saved ? 'CLOUD SAVED ✓' : 'ONLINE SAVE'}</span>
               </div>
               <p className="training-message">{message}</p>
-
               <div className="exercise-grid">
                 {exercises.map(exercise => (
                   <motion.button key={exercise.id} className={`exercise-card ${activeExercise === exercise.id ? 'is-active' : ''}`} disabled={busy} whileHover={{ y: -3 }} whileTap={{ scale: 0.97 }} onClick={() => train(exercise)}>
@@ -342,16 +357,19 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
                   </motion.button>
                 ))}
               </div>
-
               <div className="training-actions">
                 <button className="recover-button" disabled={busy || character.stamina >= 100} onClick={recover}>{activeExercise === 'rest' ? 'RECOVERING...' : 'REST · +30 STAMINA'}</button>
-                <button className={`mission-button ${missionUnlocked ? 'unlocked' : ''}`} disabled={!missionUnlocked} onClick={startMission}>
-                  {missionUnlocked ? 'MISSION · PROVE YOURSELF' : 'MISSION LOCKED · REACH POWER 7'}
-                </button>
+                <button className={`mission-button ${missionUnlocked ? 'unlocked' : ''}`} disabled={!missionUnlocked} onClick={startMission}>{missionUnlocked ? 'MISSION · PROVE YOURSELF' : 'MISSION LOCKED · REACH POWER 7'}</button>
               </div>
+              {!awakened && (
+                <button className={`awakening-button ${awakeningUnlocked ? 'ready' : ''}`} disabled={!awakeningUnlocked} onClick={beginAwakening}>
+                  {awakeningUnlocked ? 'MEDITATE · LISTEN WITHIN' : '??? · SOMETHING IS STILL QUIET'}
+                </button>
+              )}
             </div>
 
-            <motion.div className={`character-silhouette ${activeExercise ? `training-${activeExercise}` : ''}`} animate={activeExercise ? { y: [0, -7, 0], scale: [1, 1.015, 1] } : {}} transition={{ duration: 0.5 }}>
+            <motion.div className={`character-silhouette ${activeExercise ? `training-${activeExercise}` : ''} ${awakened ? 'chakra-active' : ''}`} animate={activeExercise ? { y: [0, -7, 0], scale: [1, 1.015, 1] } : {}} transition={{ duration: 0.5 }}>
+              {awakened && <div className="chakra-aura" />}
               <div className="head" /><div className="torso" />
               <AnimatePresence>{activeExercise && <motion.div className="training-ring" initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: 1.9, opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.65 }} />}</AnimatePresence>
             </motion.div>
@@ -360,49 +378,51 @@ export default function GameClient({ userId, initialCharacter }: { userId: strin
 
         {screen === 'combat' && character && (
           <motion.section key="combat" className="screen combat-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="combat-sky" />
-            <div className="combat-topbar">
-              <div><span className="quest-label">MISSION 001</span><h2>PROVE YOURSELF</h2></div>
-              <button className="combat-exit" onClick={() => setScreen('world')}>RETURN</button>
+            <div className="combat-sky" /><div className="combat-ground" />
+            {perfectFlash && <motion.div className="perfect-flash" initial={{ opacity: 0.9 }} animate={{ opacity: 0 }} transition={{ duration: 0.65 }}>PERFECT</motion.div>}
+            <div className="combat-topline"><span>MISSION // PROVE YOURSELF</span><strong>{combatText}</strong></div>
+            <div className="fighter-health player-health"><label>{character.name}</label><div><motion.i animate={{ width: `${playerHp}%` }} /></div><span>{playerHp} HP</span></div>
+            <div className="fighter-health enemy-health"><label>TRAINING OPPONENT</label><div><motion.i animate={{ width: `${(enemyHp / 60) * 100}%` }} /></div><span>{enemyHp} HP</span></div>
+            {awakened && <div className="combat-chakra"><label>CHAKRA</label><div><motion.i animate={{ width: `${chakra}%` }} /></div><span>{chakra}/100</span></div>}
+            <motion.div className="fighter player-fighter" animate={incoming ? { x: [0, -6, 0] } : {}}><div className="fighter-head" /><div className="fighter-body" />{awakened && <div className="fighter-aura" />}</motion.div>
+            <motion.div className={`fighter enemy-fighter ${incoming ? 'incoming' : ''}`} animate={incoming ? { x: [0, -14, 0] } : {}}><div className="fighter-head" /><div className="fighter-body" /></motion.div>
+            {incoming && <motion.div className="attack-cue" initial={{ scale: 0.4, opacity: 1 }} animate={{ scale: 2.2, opacity: 0 }} transition={{ duration: 0.8 }} />}
+            <div className="combat-actions">
+              {playerHp <= 0 ? (
+                <button onClick={resetCombat}>RETRY</button>
+              ) : enemyDefeated ? (
+                <button onClick={() => { setScreen('world'); resetCombat(); }}>RETURN TO WORLD</button>
+              ) : (
+                <>
+                  <button disabled={combatLocked || incoming} onClick={strike}>STRIKE</button>
+                  <button className={incoming ? 'guard-ready' : ''} disabled={!incoming || combatLocked} onClick={guard}>GUARD</button>
+                  {awakened && <button className="chakra-strike-button" disabled={combatLocked || incoming || chakra < 25} onClick={chakraStrike}>CHAKRA STRIKE · 25</button>}
+                </>
+              )}
             </div>
+          </motion.section>
+        )}
 
-            <div className="combat-arena">
-              <div className="fighter player-fighter"><div className="fighter-head" /><div className="fighter-body" /><span>{character.name}</span></div>
-              <AnimatePresence>{perfectFlash && <motion.div className="perfect-flash" initial={{ opacity: 0, scale: .7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>PERFECT</motion.div>}</AnimatePresence>
-              <div className="versus-mark">VS</div>
-              <motion.div className={`fighter enemy-fighter ${incoming ? 'enemy-windup' : ''}`} animate={incoming ? { x: [0, -10, 0] } : {}} transition={{ repeat: incoming ? Infinity : 0, duration: .22 }}>
-                <div className="fighter-head" /><div className="fighter-body" /><span>TRAINING OPPONENT</span>
-              </motion.div>
-            </div>
-
-            <div className="combat-hud">
-              <HealthBar label={character.name.toUpperCase()} value={playerHp} />
-              <HealthBar label="TRAINING OPPONENT" value={enemyHp} max={60} />
-            </div>
-
-            <motion.div className={`combat-cue ${incoming ? 'danger' : ''}`} animate={incoming ? { scale: [1, 1.025, 1] } : {}} transition={{ repeat: incoming ? Infinity : 0, duration: .45 }}>
-              {combatText}
+        {screen === 'awakening' && character && (
+          <motion.section key="awakening" className={`screen awakening-screen phase-${awakeningPhase}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="awakening-dark" />
+            <div className="awakening-pulse" />
+            <motion.div className="awakening-character" animate={awakeningPhase === 'spark' || awakeningPhase === 'awakened' ? { scale: [1, 1.04, 1], y: [0, -4, 0] } : {}} transition={{ repeat: Infinity, duration: 1.2 }}>
+              <div className="awakening-aura" /><div className="awakening-head" /><div className="awakening-body" />
             </motion.div>
-
-            <div className="combat-controls">
-              <button className="combat-action strike-action" disabled={combatLocked || incoming || enemyDefeated || playerHp <= 0} onClick={strike}>STRIKE</button>
-              <button className={`combat-action guard-action ${incoming ? 'guard-ready' : ''}`} disabled={!incoming || playerHp <= 0} onClick={guard}>GUARD</button>
+            <div className="awakening-copy">
+              {awakeningPhase === 'stillness' && <><p>BREATH IN.</p><h2>Silence.</h2><span>For the first time, you stop trying to become stronger.</span></>}
+              {awakeningPhase === 'signal' && <><p>UNKNOWN ENERGY DETECTED</p><h2>Something answers.</h2><span>A pressure moves beneath your skin. It does not feel like stamina.</span></>}
+              {awakeningPhase === 'collapse' && <><p>HEART RATE // CRITICAL</p><h2>Your body rejects it.</h2><span>The world narrows to one heartbeat.</span></>}
+              {awakeningPhase === 'spark' && <><p>ENERGY PATHWAY // OPEN</p><h2>Hold it.</h2><span>Do not push it away.</span></>}
+              {awakeningPhase === 'awakened' && <><p>NEW ENERGY ACQUIRED</p><h2>CHAKRA AWAKENED</h2><span>Rank updated: CHAKRA STUDENT · +10 Power · +2 Focus</span><button className="awakening-continue" onClick={() => setScreen('world')}>OPEN YOUR EYES</button></>}
             </div>
-
-            <p className="combat-tip">Perfect Guard window: react after the attack cue begins, just before impact.</p>
-
-            {playerHp <= 0 && <button className="retry-button" onClick={resetCombat}>RETRY FIGHT</button>}
-            {enemyDefeated && <button className="retry-button victory" onClick={() => setScreen('world')}>MISSION COMPLETE · RETURN</button>}
+            {(awakeningPhase === 'spark' || awakeningPhase === 'awakened') && <div className="chakra-particles">{Array.from({ length: 18 }).map((_, i) => <i key={i} style={{ '--i': i } as React.CSSProperties} />)}</div>}
           </motion.section>
         )}
       </AnimatePresence>
     </main>
   );
-}
-
-function HealthBar({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
-  const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  return <div className="health-card"><div><span>{label}</span><strong>{value}/{max}</strong></div><div className="health-track"><motion.div className="health-fill" animate={{ width: `${pct}%` }} /></div></div>;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
