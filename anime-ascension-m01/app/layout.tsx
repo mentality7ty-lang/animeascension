@@ -5,6 +5,7 @@ import './combat.css';
 import './chakra.css';
 import './chakra-training.css';
 import './mission/mission.css';
+import MissionLauncher from './mission/mission-launcher';
 
 export const metadata: Metadata = {
   title: 'Anime Ascension',
@@ -12,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<MissionLauncher /></body></html>;
 }
