@@ -4,6 +4,7 @@ import './auth.css';
 import './combat.css';
 import './chakra.css';
 import './chakra-training.css';
+import './mission/mission.css';
 
 export const metadata: Metadata = {
   title: 'Anime Ascension',
