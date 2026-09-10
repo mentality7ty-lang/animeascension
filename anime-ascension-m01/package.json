@@ -1,24 +1,8 @@
 {
   "name": "anime-ascension",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.57.4",
-    "framer-motion": "^12.23.12",
-    "next": "^15.5.3",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
-  },
-  "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
-    "typescript": "^5.9.2"
-  }
+  "scripts": {"dev":"next dev","build":"next build","start":"next start"},
+  "dependencies": {"@supabase/ssr":"^0.7.0","@supabase/supabase-js":"^2.57.4","framer-motion":"^12.23.12","next":"^15.5.3","react":"^19.1.1","react-dom":"^19.1.1"},
+  "devDependencies": {"@types/node":"^24.3.0","@types/react":"^19.1.10","@types/react-dom":"^19.1.7","typescript":"^5.9.2"}
 }
