@@ -1,1 +1,138 @@
-'use client';import Link from 'next/link';import {motion} from 'framer-motion';import {useState} from 'react';import {createClient} from '@/lib/supabase/client';type C={name:string;power:number;focus:number;rank:string;world:string};export default function Client({userId,initialCharacter:c}:{userId:string;initialCharacter:C}){const db=createClient(),already=c.rank.toLowerCase().includes('resonant');const [phase,setPhase]=useState<'brief'|'tune'|'open'>(already?'open':'brief'),[sync,setSync]=useState(already?100:0),[signal,setSignal]=useState(50),[msg,setMsg]=useState(already?'STABLE WORLD RESONANCE':'Kairo rebuilt the fracture using the recovered residue.'),[busy,setBusy]=useState(false);function tune(){if(busy)return;setBusy(true);const target=45+Math.random()*10,setSignal(Math.round(target));const gain=Math.max(8,32-Math.abs(target-50)*2)+Math.min(10,c.focus);const next=Math.min(100,sync+Math.round(gain));setSync(next);setMsg(next>=100?'RESONANCE LOCKED · THE FRACTURE IS STABILIZING':`RESONANCE +${Math.round(gain)}%`);setTimeout(()=>{setBusy(false);if(next>=100)void open()},650)}async function open(){if(!already)await db.from('characters').update({power:c.power+25,rank:`${c.rank} · Resonant`,updated_at:new Date().toISOString()}).eq('user_id',userId);setPhase('open');setMsg('GATEWAY STABLE · UNKNOWN WORLD CONNECTED')}return <main className="res-shell"><div className={`portal ${phase==='open'?'stable':''}`}><div/><div/><div/></div><header><span>WORLD RESONANCE // CLASSIFIED</span><strong>{msg}</strong></header>{phase==='brief'&&<section className="res-card"><span>CHAPTER II · FRACTURE RESEARCH</span><h1>Open it again.</h1><p>The Border Breach was not random. Kairo has isolated the foreign frequency. Your chakra is the only known energy that has survived direct contact with it.</p><button onClick={()=>setPhase('tune')}>BEGIN CALIBRATION</button><Link href="/village">RETURN</Link></section>}{phase==='tune'&&<section className="calibration"><span>RESONANCE SYNCHRONIZATION</span><strong>{sync}%</strong><i><em style={{width:`${sync}%`}}/></i><div className="wave"><motion.b animate={{x:[0,signal*3,0]}} transition={{duration:1,repeat:Infinity}}/></div><p>Match your chakra rhythm to the foreign signal without letting either energy consume the other.</p><button disabled={busy} onClick={tune}>SYNC PULSE</button></section>}{phase==='open'&&<section className="world-reveal"><span>WORLD 02 // CONNECTION ESTABLISHED</span><h1>CURSED METROPOLIS</h1><p>A modern city saturated with an energy born from negative emotion. Your Chakra remains intact — but this world is reacting to you with something new.</p><div className="energy-preview"><small>FOREIGN ENERGY</small><strong>CURSED ENERGY</strong><b>STATUS · DORMANT</b></div><div className="rewards">+25 POWER · WORLD RESONANCE UNLOCKED</div><Link href="/cursed-metropolis">CROSS THE GATE →</Link><Link className="secondary" href="/village">STAY IN NINJA WORLD</Link></section>}</main>}
+'use client';
+
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+type C = {
+  name: string;
+  power: number;
+  focus: number;
+  rank: string;
+  world: string;
+};
+
+export default function Client({
+  userId,
+  initialCharacter: c,
+}: {
+  userId: string;
+  initialCharacter: C;
+}) {
+  const db = createClient();
+  const already = c.rank.toLowerCase().includes('resonant');
+
+  const [phase, setPhase] = useState<'brief' | 'tune' | 'open'>(already ? 'open' : 'brief');
+  const [sync, setSync] = useState(already ? 100 : 0);
+  const [signal, setSignal] = useState(50);
+  const [msg, setMsg] = useState(
+    already ? 'STABLE WORLD RESONANCE' : 'Kairo rebuilt the fracture using the recovered residue.'
+  );
+  const [busy, setBusy] = useState(false);
+
+  function tune() {
+    if (busy) return;
+    setBusy(true);
+
+    const target = 45 + Math.random() * 10;
+    setSignal(Math.round(target));
+
+    const gain = Math.max(8, 32 - Math.abs(target - 50) * 2) + Math.min(10, c.focus);
+    const next = Math.min(100, sync + Math.round(gain));
+
+    setSync(next);
+    setMsg(
+      next >= 100
+        ? 'RESONANCE LOCKED · THE FRACTURE IS STABILIZING'
+        : `RESONANCE +${Math.round(gain)}%`
+    );
+
+    setTimeout(() => {
+      setBusy(false);
+      if (next >= 100) void open();
+    }, 650);
+  }
+
+  async function open() {
+    if (!already) {
+      await db
+        .from('characters')
+        .update({
+          power: c.power + 25,
+          rank: `${c.rank} · Resonant`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+    }
+
+    setPhase('open');
+    setMsg('GATEWAY STABLE · UNKNOWN WORLD CONNECTED');
+  }
+
+  return (
+    <main className="res-shell">
+      <div className={`portal ${phase === 'open' ? 'stable' : ''}`}>
+        <div />
+        <div />
+        <div />
+      </div>
+
+      <header>
+        <span>WORLD RESONANCE // CLASSIFIED</span>
+        <strong>{msg}</strong>
+      </header>
+
+      {phase === 'brief' && (
+        <section className="res-card">
+          <span>CHAPTER II · FRACTURE RESEARCH</span>
+          <h1>Open it again.</h1>
+          <p>
+            The Border Breach was not random. Kairo has isolated the foreign frequency. Your chakra is the
+            only known energy that has survived direct contact with it.
+          </p>
+          <button onClick={() => setPhase('tune')}>BEGIN CALIBRATION</button>
+          <Link href="/village">RETURN</Link>
+        </section>
+      )}
+
+      {phase === 'tune' && (
+        <section className="calibration">
+          <span>RESONANCE SYNCHRONIZATION</span>
+          <strong>{sync}%</strong>
+          <i>
+            <em style={{ width: `${sync}%` }} />
+          </i>
+          <div className="wave">
+            <motion.b animate={{ x: [0, signal * 3, 0] }} transition={{ duration: 1, repeat: Infinity }} />
+          </div>
+          <p>Match your chakra rhythm to the foreign signal without letting either energy consume the other.</p>
+          <button disabled={busy} onClick={tune}>
+            SYNC PULSE
+          </button>
+        </section>
+      )}
+
+      {phase === 'open' && (
+        <section className="world-reveal">
+          <span>WORLD 02 // CONNECTION ESTABLISHED</span>
+          <h1>CURSED METROPOLIS</h1>
+          <p>
+            A modern city saturated with an energy born from negative emotion. Your Chakra remains intact —
+            but this world is reacting to you with something new.
+          </p>
+          <div className="energy-preview">
+            <small>FOREIGN ENERGY</small>
+            <strong>CURSED ENERGY</strong>
+            <b>STATUS · DORMANT</b>
+          </div>
+          <div className="rewards">+25 POWER · WORLD RESONANCE UNLOCKED</div>
+          <Link href="/cursed-metropolis">CROSS THE GATE →</Link>
+          <Link className="secondary" href="/village">
+            STAY IN NINJA WORLD
+          </Link>
+        </section>
+      )}
+    </main>
+  );
+}
