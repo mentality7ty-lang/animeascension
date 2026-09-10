@@ -5,6 +5,7 @@ import './combat.css';
 import './chakra.css';
 import './chakra-training.css';
 import './mission/mission.css';
+import './village/village.css';
 import MissionLauncher from './mission/mission-launcher';
 
 export const metadata: Metadata = {
