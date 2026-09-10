@@ -1,0 +1,4 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import ValleyClient from './valley-client';
+export default async function Page(){const db=await createClient();const {data:x}=await db.auth.getClaims();const id=x?.claims?.sub;if(!id)redirect('/login');const {data:c}=await db.from('characters').select('name,power,strength,speed,endurance,focus,rank,world').eq('user_id',id).maybeSingle();if(!c||c.world!=='frontier'||!c.rank?.toLowerCase().includes('riven tested'))redirect('/life-frontier');return <ValleyClient userId={id} character={c}/>}
